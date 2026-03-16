@@ -1,0 +1,194 @@
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.12-blue?logo=python&logoColor=white" alt="Python 3.12">
+  <img src="https://img.shields.io/badge/ML-Isolation%20Forest-green?logo=scikit-learn&logoColor=white" alt="ML">
+  <img src="https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/Dashboard-Streamlit-FF4B4B?logo=streamlit&logoColor=white" alt="Streamlit">
+  <img src="https://img.shields.io/badge/Status-Phase%201%20Complete-brightgreen" alt="Status">
+</p>
+
+# Real-Time Log Anomaly Detection & Root Cause Analysis Platform
+
+A production-style AIOps pipeline that detects anomalous behaviour in distributed microservices and infers the probable root cause — using nothing but log data.
+
+## What this project does
+
+```
+Simulated Services  →  Log Normalizer  →  Feature Extractor  →  Anomaly Detector  →  Root Cause Analysis
+    (6 services)         (validation)       (60s windows)       (Isolation Forest)      (dependency graph)
+```
+
+1. **Generates** realistic microservice logs with configurable anomaly injection (latency spikes, error storms, traffic drops, mixed degradation)
+2. **Normalises** raw events into a typed, validated schema (OpenTelemetry-aligned)
+3. **Extracts** time-windowed features: latency percentiles, error rates, request volumes, event type distributions
+4. **Detects** anomalies using an Isolation Forest trained on normal-only windows
+5. **Infers root causes** by walking the service dependency graph to find the deepest anomalous upstream service
+6. **Exposes** results through a FastAPI REST API and a Streamlit dashboard
+
+---
+
+## Architecture
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────────┐     ┌──────────────┐     ┌───────────────┐
+│  Log         │     │  Normalizer  │     │  Feature         │     │  Anomaly     │     │  Root Cause   │
+│  Generator   │────▶│  (Pydantic)  │────▶│  Extractor       │────▶│  Detector    │────▶│  Analysis     │
+│              │     │              │     │  (60s windows)   │     │  (IsoForest) │     │  (Dep Graph)  │
+└──────────────┘     └──────────────┘     └──────────────────┘     └──────────────┘     └───────────────┘
+      │                                                                                        │
+      ▼                                                                                        ▼
+   data/raw/                                                                              data/results/
+   (JSON)                                                                            anomalies.json
+                                                                                     alerts.json
+                                                                                     metrics.json
+```
+
+### Service Dependency Graph
+
+```
+frontend-service
+├── auth-service
+├── payment-service → db-service
+└── inventory-service → db-service
+
+notification-service (standalone)
+db-service (leaf node, shared dependency)
+```
+
+---
+
+## Phase 1: Data Simulation & Exploration (Current)
+
+### Generated Data
+
+- **306,000+** log events across 6 services over 60 minutes
+- **19 anomaly windows** injected with 4 distinct failure modes
+- Each event carries **20 fields** including `trace_id`, `span_id`, `host_id`, `severity_number` (OpenTelemetry-aligned)
+
+### Visual Validation
+
+Anomaly windows are shaded on each chart. Spikes/drops must visually align with the shaded regions — if they don't, the generator needs fixing.
+
+**Latency P95 by Service:**
+
+![Latency P95](notebooks/figures/latency_p95_by_service.png)
+
+**Error Rate by Service:**
+
+![Error Rate](notebooks/figures/error_rate_by_service.png)
+
+**Request Volume by Service:**
+
+![Request Volume](notebooks/figures/request_volume_by_service.png)
+
+---
+
+## JSON Schema (Locked)
+
+Every downstream component depends on this shape. The schema is considered **locked** as of Phase 1.
+
+```json
+{
+  "trace_id":             "string  — 24-char hex, links spans across services",
+  "span_id":              "string  — unique per hop within a trace",
+  "timestamp_iso":        "string  — ISO 8601 with timezone",
+  "timestamp_unix":       "float   — seconds since epoch, 3 decimal places",
+  "service_name":         "string  — e.g. frontend-service",
+  "host_id":              "string  — e.g. frontend-service-pod-2",
+  "environment":          "string  — production (V1 constant)",
+  "endpoint":             "string  — e.g. /home, /auth/login",
+  "method":               "string  — GET | POST | PUT | DELETE",
+  "log_level":            "string  — DEBUG | INFO | WARN | ERROR | FATAL",
+  "severity_number":      "int     — OTel-aligned: DEBUG=5, INFO=9, WARN=13, ERROR=17, FATAL=21",
+  "status_code":          "int     — HTTP status code (200, 500, etc.)",
+  "latency_ms":           "float   — response latency in milliseconds",
+  "request_id":           "string  — unique per request",
+  "dependency":           "string? — downstream service called, or null",
+  "event_type":           "string  — semantic label (request_ok, slow_response, db_refused, ...)",
+  "message":              "string  — human-readable log message",
+  "is_synthetic_anomaly": "bool    — true if event was generated during an anomaly window",
+  "anomaly_type":         "string? — latency_spike | error_storm | traffic_drop | mixed | null"
+}
+```
+
+---
+
+## Anomaly Types
+
+| Type | Effect | Key Indicators |
+|------|--------|---------------|
+| `latency_spike` | 8x latency multiplier | P95 latency jumps, `slow_response` events |
+| `error_storm` | 45% error rate, 1.2x RPS | 5xx spike, `upstream_failure` / `db_refused` events |
+| `traffic_drop` | 0.1x RPS, 1.1x latency | Request volume collapses, `traffic_drop` events |
+| `mixed` | 5x latency, 30% errors, 0.7x RPS | Combined degradation pattern |
+
+---
+
+## Quick Start
+
+```bash
+# Clone
+git clone https://github.com/<your-username>/Multi-Service-Log-Anomaly-Detection.git
+cd Multi-Service-Log-Anomaly-Detection
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Generate simulated logs
+python simulate_data/generate.py --minutes 60 --seed 42
+
+# Run exploration / visual validation
+python notebooks/anomaly_exploration.py
+```
+
+---
+
+## Project Structure
+
+```
+Multi-Service-Log-Anomaly-Detection/
+├── simulate_data/
+│   └── generate.py            # Microservice log generator
+├── notebooks/
+│   ├── anomaly_exploration.py # Visual validation script
+│   └── figures/               # Generated plots
+├── configs/
+│   └── services.yaml          # Service topology + anomaly profiles
+├── data/                      # Generated at runtime (.gitignored)
+│   └── raw/                   # Raw JSON output
+├── .env.example
+├── .gitignore
+├── Makefile
+├── requirements.txt
+└── README.md
+```
+
+---
+
+## Roadmap
+
+- [x] **Phase 1** — Data simulation, exploration, schema lock
+- [ ] **Phase 2** — Normalizer, feature extractor, Isolation Forest detector, RCA engine
+- [ ] **Phase 3** — FastAPI + Streamlit dashboard
+- [ ] **Phase 4** — Docker, Kafka streaming, PostgreSQL/InfluxDB
+- [ ] **Phase 5** — CI/CD, public dataset benchmarking (HDFS)
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Language | Python 3.12 |
+| ML | scikit-learn (Isolation Forest) |
+| Data | pandas, NumPy |
+| Schemas | Pydantic v2 |
+| Config | YAML |
+| API | FastAPI |
+| Dashboard | Streamlit |
+| Visualization | Matplotlib |
+
+---
+
+## License
+
+MIT

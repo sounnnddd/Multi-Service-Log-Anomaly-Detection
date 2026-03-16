@@ -1,0 +1,85 @@
+# Service topology and baseline configurations for log simulation.
+
+services:
+  - name: frontend-service
+    endpoints: ["/home", "/search", "/checkout", "/login"]
+    baseline_rps: 25
+    baseline_latency_mean: 60
+    baseline_latency_std: 20
+    baseline_error_rate: 0.01
+    dependencies: ["auth-service", "payment-service", "inventory-service"]
+    host_count: 3
+
+  - name: auth-service
+    endpoints: ["/auth/login", "/auth/logout", "/auth/refresh", "/auth/verify"]
+    baseline_rps: 20
+    baseline_latency_mean: 45
+    baseline_latency_std: 15
+    baseline_error_rate: 0.01
+    dependencies: []
+    host_count: 2
+
+  - name: payment-service
+    endpoints: ["/api/v1/charge", "/api/v1/refund", "/api/v1/status"]
+    baseline_rps: 12
+    baseline_latency_mean: 85
+    baseline_latency_std: 30
+    baseline_error_rate: 0.02
+    dependencies: ["db-service"]
+    host_count: 2
+
+  - name: inventory-service
+    endpoints: ["/inventory/check", "/inventory/reserve", "/inventory/release"]
+    baseline_rps: 8
+    baseline_latency_mean: 120
+    baseline_latency_std: 40
+    baseline_error_rate: 0.03
+    dependencies: ["db-service"]
+    host_count: 2
+
+  - name: notification-service
+    endpoints: ["/notify/email", "/notify/sms", "/notify/push"]
+    baseline_rps: 5
+    baseline_latency_mean: 200
+    baseline_latency_std: 80
+    baseline_error_rate: 0.04
+    dependencies: []
+    host_count: 1
+
+  - name: db-service
+    endpoints: ["/db/query", "/db/write", "/db/read"]
+    baseline_rps: 18
+    baseline_latency_mean: 35
+    baseline_latency_std: 10
+    baseline_error_rate: 0.005
+    dependencies: []
+    host_count: 3
+
+anomaly_profiles:
+  latency_spike:
+    latency_multiplier: 8.0
+    error_rate: 0.05
+    rps_multiplier: 1.0
+    status_500_rate: 0.04
+    description: "Dependency slowdown causing response latency inflation"
+
+  error_storm:
+    latency_multiplier: 2.5
+    error_rate: 0.45
+    rps_multiplier: 1.2
+    status_500_rate: 0.42
+    description: "Upstream or downstream failure causing sustained 5xx burst"
+
+  traffic_drop:
+    latency_multiplier: 1.1
+    error_rate: 0.02
+    rps_multiplier: 0.1
+    status_500_rate: 0.01
+    description: "Service traffic collapse due to crash, unhealthy instance, or load balancer removal"
+
+  mixed:
+    latency_multiplier: 5.0
+    error_rate: 0.30
+    rps_multiplier: 0.7
+    status_500_rate: 0.28
+    description: "Resource exhaustion scenario causing latency, failures, and throughput degradation"
