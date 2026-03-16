@@ -3,7 +3,7 @@
   <img src="https://img.shields.io/badge/ML-Isolation%20Forest-green?logo=scikit-learn&logoColor=white" alt="ML">
   <img src="https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI">
   <img src="https://img.shields.io/badge/Dashboard-Streamlit-FF4B4B?logo=streamlit&logoColor=white" alt="Streamlit">
-  <img src="https://img.shields.io/badge/Status-Phase%201%20Complete-brightgreen" alt="Status">
+  <img src="https://img.shields.io/badge/Status-Phase%202%20Complete-brightgreen" alt="Status">
 </p>
 
 # Real-Time Log Anomaly Detection & Root Cause Analysis Platform
@@ -56,7 +56,23 @@ db-service (leaf node, shared dependency)
 
 ---
 
-## Phase 1: Data Simulation & Exploration (Current)
+## Pipeline Results
+
+```
+Events generated:    306,360
+Feature windows:     366
+Anomalies detected:  130
+Alerts generated:    12
+Precision:           0.800
+Recall:              0.972
+F1 Score:            0.878
+```
+
+The Isolation Forest achieves **97% recall** (catches nearly all real anomalies) with **80% precision** (low false positive rate).
+
+---
+
+## Phase 1: Data Simulation & Exploration
 
 ### Generated Data
 
@@ -147,14 +163,27 @@ python notebooks/anomaly_exploration.py
 ```
 Multi-Service-Log-Anomaly-Detection/
 ├── simulate_data/
-│   └── generate.py            # Microservice log generator
+│   └── generate.py              # Microservice log generator
+├── src/
+│   ├── schemas/                 # Pydantic contracts (enums, events, features, alerts)
+│   ├── normalizer/              # Raw JSON -> validated typed events
+│   ├── feature_extractor/       # 60s windowed aggregation -> 19 features
+│   ├── detector/                # Isolation Forest anomaly scoring
+│   └── rca/                     # Dependency-graph root cause analysis
+├── scripts/
+│   ├── run_pipeline.py          # End-to-end pipeline runner
+│   └── train.py                 # Standalone model training
 ├── notebooks/
-│   ├── anomaly_exploration.py # Visual validation script
-│   └── figures/               # Generated plots
+│   ├── anomaly_exploration.py   # Visual validation script
+│   └── figures/                 # Generated plots
 ├── configs/
-│   └── services.yaml          # Service topology + anomaly profiles
-├── data/                      # Generated at runtime (.gitignored)
-│   └── raw/                   # Raw JSON output
+│   └── services.yaml            # Service topology + anomaly profiles
+├── data/                        # Generated at runtime (.gitignored)
+│   ├── raw/                     # Generator output
+│   ├── normalized/              # Normalizer output
+│   ├── features/                # Feature CSVs
+│   ├── models/                  # Trained model artifacts
+│   └── results/                 # Anomalies, alerts, metrics JSON
 ├── .env.example
 ├── .gitignore
 ├── Makefile
@@ -167,7 +196,7 @@ Multi-Service-Log-Anomaly-Detection/
 ## Roadmap
 
 - [x] **Phase 1** — Data simulation, exploration, schema lock
-- [ ] **Phase 2** — Normalizer, feature extractor, Isolation Forest detector, RCA engine
+- [x] **Phase 2** — Schemas, normalizer, feature extractor, Isolation Forest detector, RCA engine
 - [ ] **Phase 3** — FastAPI + Streamlit dashboard
 - [ ] **Phase 4** — Docker, Kafka streaming, PostgreSQL/InfluxDB
 - [ ] **Phase 5** — CI/CD, public dataset benchmarking (HDFS)
@@ -187,8 +216,4 @@ Multi-Service-Log-Anomaly-Detection/
 | Dashboard | Streamlit |
 | Visualization | Matplotlib |
 
----
 
-## License
-
-MIT
