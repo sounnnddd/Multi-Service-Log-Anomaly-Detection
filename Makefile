@@ -20,10 +20,10 @@ pipeline: generate normalize extract train detect
 
 # --- Services ---
 api:
-	uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+	python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
 
 dashboard:
-	streamlit run src/dashboard/app.py --server.port 8501
+	python -m streamlit run src/dashboard/app.py --server.port 8501
 
 # --- Testing ---
 test:

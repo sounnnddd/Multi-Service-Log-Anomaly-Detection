@@ -3,7 +3,7 @@
   <img src="https://img.shields.io/badge/ML-Isolation%20Forest-green?logo=scikit-learn&logoColor=white" alt="ML">
   <img src="https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI">
   <img src="https://img.shields.io/badge/Dashboard-Streamlit-FF4B4B?logo=streamlit&logoColor=white" alt="Streamlit">
-  <img src="https://img.shields.io/badge/Status-Phase%202%20Complete-brightgreen" alt="Status">
+  <img src="https://img.shields.io/badge/Status-Phase%203%20Complete-brightgreen" alt="Status">
 </p>
 
 # Real-Time Log Anomaly Detection & Root Cause Analysis Platform
@@ -149,11 +149,17 @@ cd Multi-Service-Log-Anomaly-Detection
 # Install dependencies
 pip install -r requirements.txt
 
-# Generate simulated logs
-python simulate_data/generate.py --minutes 60 --seed 42
+# Run the full pipeline (generate → normalise → features → detect → RCA)
+python scripts/run_pipeline.py --minutes 60 --seed 42
 
-# Run exploration / visual validation
-python notebooks/anomaly_exploration.py
+# Start the API (terminal 1)
+uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+# Start the dashboard (terminal 2)
+streamlit run src/dashboard/app.py --server.port 8501
+
+# Run tests
+python -m pytest tests/ -v
 ```
 
 ---
@@ -188,8 +194,42 @@ Multi-Service-Log-Anomaly-Detection/
 ├── .gitignore
 ├── Makefile
 ├── requirements.txt
+├── tests/
+│   └── test_api.py              # API endpoint tests (20 tests)
 └── README.md
 ```
+
+---
+
+## API Endpoints
+
+Start the API with `python -m uvicorn src.api.main:app --port 8000 --reload`.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Health check + data loaded status |
+| GET | `/events` | Paginated normalised events (filter: `service`, `log_level`, `limit`, `offset`) |
+| GET | `/features` | Feature windows (filter: `service`, `anomaly_only`) |
+| GET | `/anomalies` | Anomaly events (filter: `service`, `anomaly_only`, `min_confidence`) |
+| GET | `/anomalies/summary` | Per-service anomaly breakdown |
+| GET | `/alerts` | Root cause alerts (filter: `severity`, `service`) |
+| GET | `/alerts/{id}` | Single alert by ID |
+| GET | `/metrics` | Pipeline evaluation metrics (precision, recall, F1) |
+
+Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
+
+---
+
+## Dashboard
+
+Start with `python -m streamlit run src/dashboard/app.py --server.port 8501`.
+
+**Sections:**
+- **KPI Cards** — Total events, windows, anomalies, alerts, F1 score
+- **Anomaly Timeline** — Interactive Plotly chart of anomaly scores per service
+- **Service Heatmap** — Service × time heatmap coloured by confidence
+- **Alert Table** — Filterable table of root cause alerts
+- **Feature Explorer** — Per-service feature trends with anomaly window shading
 
 ---
 
@@ -197,7 +237,7 @@ Multi-Service-Log-Anomaly-Detection/
 
 - [x] **Phase 1** — Data simulation, exploration, schema lock
 - [x] **Phase 2** — Schemas, normalizer, feature extractor, Isolation Forest detector, RCA engine
-- [ ] **Phase 3** — FastAPI + Streamlit dashboard
+- [x] **Phase 3** — FastAPI REST API + Streamlit dashboard
 - [ ] **Phase 4** — Docker, Kafka streaming, PostgreSQL/InfluxDB
 - [ ] **Phase 5** — CI/CD, public dataset benchmarking (HDFS)
 
